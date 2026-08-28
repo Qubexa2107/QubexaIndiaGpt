@@ -17,9 +17,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# API Key लोड करा आणि Google GenAI Client तयार करा
 API_KEY = os.getenv("GEMINI_API_KEY")
-client = genai.Client(api_key=API_KEY)  # <-- ही लाइन जोडणे आवश्यक आहे
 
 SYSTEM_INSTRUCTION = """
 You are 'QubexaIndiaGpt' - the official AI assistant of Qubexa.
@@ -39,20 +37,22 @@ class ChatResponse(BaseModel):
 async def chat_with_qubexa(request: ChatRequest):
     user_input = request.query or request.message
     if not user_input:
-        raise HTTPException(status_code=400, detail="Query or message cannot be empty.")
+        raise HTTPException(status_code=400, detail="Query cannot be empty.")
+
+    if not API_KEY:
+        print("Backend Execution Error: GEMINI_API_KEY is missing on Render Environment Variables.")
+        raise HTTPException(status_code=500, detail="Server API key is not configured.")
 
     try:
+        client = genai.Client(api_key=API_KEY)
+        
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=user_input,
-            config=dict(
-                system_instruction=SYSTEM_INSTRUCTION,
-                temperature=0.7
-            )
+            model="gemini-3.6-flash",
+            contents=f"System Instruction: {SYSTEM_INSTRUCTION}\n\nUser Question: {user_input}"
         )
         return ChatResponse(reply=response.text)
     except Exception as e:
-        print(f"Backend Execution Error: {e}")
+        print(f"Backend Execution Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/")
